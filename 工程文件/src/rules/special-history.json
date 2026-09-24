@@ -1,0 +1,34 @@
+{
+  "periods": [
+    {
+      "id": "2.5-special-rerun",
+      "version": "2.5",
+      "start": "2026-01-21",
+      "end": "2026-02-05",
+      "source": "https://www.hoyolab.com/article/43362738",
+      "families": {
+        "rescreening": {
+          "targets": ["爱丽丝", "零号·安比", "耀嘉音"]
+        },
+        "reverberation": {
+          "targets": ["十方锻星", "牺牲洁纯", "玲珑妆匣"]
+        }
+      }
+    },
+    {
+      "id": "3.1-special-rerun",
+      "version": "3.1",
+      "start": "2026-08-19",
+      "end": "2026-09-08",
+      "source": "https://www.hoyolab.com/article/46329735",
+      "families": {
+        "rescreening": {
+          "targets": ["琉音", "柚叶", "悠真"]
+        },
+        "reverberation": {
+          "targets": ["昨夜来电", "狸法七变化", "残心青囊"]
+        }
+      }
+    }
+  ]
+}
