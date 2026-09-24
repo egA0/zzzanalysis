@@ -1,8 +1,0 @@
-工程文件/node_modules/
-工程文件/dist/
-工程文件/playwright-report/
-工程文件/test-results/
-工程文件/*.tsbuildinfo
-工程文件/*.log
-回滚备份_变更前_2026-09-22/
-回滚备份_变更前_2026-09-22.zip
