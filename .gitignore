@@ -1,0 +1,29 @@
+# Dependencies and generated build files
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Test output and coverage
+playwright-report/
+test-results/
+coverage/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs, personal exports, and backup archives
+*.log
+exports/
+backups/
+*.zip
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
