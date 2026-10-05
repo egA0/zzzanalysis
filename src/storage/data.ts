@@ -612,6 +612,7 @@ export const migrate = (input: unknown): AppData => {
     ),
     seed: whole(settings.seed ?? base.settings.seed, 0, 4294967295),
     theme: settings.theme === "light" ? "light" : "dark",
+    showGuideOnStartup: settings.showGuideOnStartup !== false,
     language: "zh-CN",
   };
   if (Array.isArray(source.versionResources)) {

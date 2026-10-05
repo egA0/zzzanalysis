@@ -148,3 +148,30 @@ it("迁移时修复 2.4/2.5 旧卡池快照并保留手工记录", () => {
       ?.featured,
   ).toBe("用户手工记录");
 });
+
+it("新建数据与旧版备份默认显示使用指引，不改变原有资源与主题", () => {
+  expect(initialData().settings.showGuideOnStartup).toBe(true);
+  const old = initialData();
+  old.resources.film = 1600;
+  old.settings.theme = "light";
+  delete (old.settings as unknown as Record<string, unknown>)
+    .showGuideOnStartup;
+  const migrated = migrate(old);
+  expect(migrated.settings.showGuideOnStartup).toBe(true);
+  expect(migrated.resources.film).toBe(1600);
+  expect(migrated.settings.theme).toBe("light");
+});
+
+it.each([true, false])("使用指引自动显示偏好 %s 在导入迁移后保留", (show) => {
+  const data = initialData();
+  data.settings.showGuideOnStartup = show;
+  const migrated = migrate(JSON.parse(JSON.stringify(data)));
+  expect(migrated.settings.showGuideOnStartup).toBe(show);
+});
+
+it.each([null, "false", 0])("无效的使用指引偏好 %s 回退为默认显示", (value) => {
+  const data = initialData();
+  (data.settings as unknown as Record<string, unknown>).showGuideOnStartup =
+    value;
+  expect(migrate(data).settings.showGuideOnStartup).toBe(true);
+});

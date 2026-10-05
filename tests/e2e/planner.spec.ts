@@ -1,19 +1,24 @@
 import { expect, test } from "@playwright/test";
+import { navigate, openPlanner, dismissStartupGuide } from "./helpers";
+
+test.beforeEach(async ({ page }) => {
+  await page.route("**/wiki.biligame.com/**", (route) => route.abort());
+});
 
 test("资源、保底、目标、计算与本地保存", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await openPlanner(page);
   await expect(page.getByRole("heading", { name: "抽卡规划台" })).toBeVisible();
-  await page.getByRole("button", { name: "当前资源" }).first().click();
+  await navigate(page, "当前资源");
   await page
     .getByRole("spinbutton", { name: "菲林", exact: true })
     .fill("1600");
   await expect(page.getByText("10", { exact: true }).first()).toBeVisible();
-  await page.getByRole("button", { name: "卡池状态" }).first().click();
+  await navigate(page, "卡池状态");
   await page.getByRole("spinbutton", { name: "当前垫数" }).first().fill("89");
-  await page.getByRole("button", { name: "目标编辑" }).first().click();
+  await navigate(page, "目标编辑");
   await page.getByRole("button", { name: "角色", exact: true }).click();
   await page.getByRole("textbox", { name: "目标名称" }).fill("测试目标");
-  await page.getByRole("button", { name: "概率分析" }).first().click();
+  await navigate(page, "概率分析");
   await expect(page.getByText("整套计划完成概率")).toBeVisible({
     timeout: 60000,
   });
@@ -40,7 +45,8 @@ test("资源、保底、目标、计算与本地保存", async ({ page }, testIn
       }),
   ).toBeGreaterThan(10);
   await page.reload();
-  await page.getByRole("button", { name: "当前资源" }).first().click();
+  await dismissStartupGuide(page);
+  await navigate(page, "当前资源");
   await expect(
     page.getByRole("spinbutton", { name: "菲林", exact: true }),
   ).toHaveValue("1600");
@@ -55,9 +61,9 @@ test("资源、保底、目标、计算与本地保存", async ({ page }, testIn
   ).toBe(true);
 });
 
-test("方案删除确认、来源和估算收入开关", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "方案比较" }).first().click();
+test("方案删除确认、来源和未来资源累计开关", async ({ page }) => {
+  await openPlanner(page);
+  await navigate(page, "方案比较");
   await page.getByRole("button", { name: "保存副本" }).click();
   page.once("dialog", (dialog) => dialog.dismiss());
   await page
@@ -65,37 +71,48 @@ test("方案删除确认、来源和估算收入开关", async ({ page }) => {
     .last()
     .click();
   await expect(page.getByText("我的规划 副本", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "数据来源" }).first().click();
+  await navigate(page, "数据来源");
   await expect(page.getByText("需要再次确认")).toBeVisible();
-  await page.getByRole("button", { name: "设置" }).first().click();
+  await navigate(page, "设置");
+  const futureResources = page.getByRole("checkbox", {
+    name: "将未来资源累计计入可用资源（默认开启）",
+  });
+  await expect(futureResources).toBeChecked();
+  await futureResources.uncheck();
+  await expect(futureResources).not.toBeChecked();
+  await page.reload();
+  await dismissStartupGuide(page);
+  await navigate(page, "设置");
   await expect(
-    page.getByRole("checkbox", { name: /将估算收入计入/ }),
+    page.getByRole("checkbox", {
+      name: "将未来资源累计计入可用资源（默认开启）",
+    }),
   ).not.toBeChecked();
 });
 test("关闭歪后保证后显示无有限最坏需求", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "设置" }).first().click();
+  await openPlanner(page);
+  await navigate(page, "设置");
   await page
     .getByRole("checkbox", { name: "歪后下一次 S 必定限定" })
     .first()
     .uncheck();
-  await page.getByRole("button", { name: "当前资源" }).first().click();
+  await navigate(page, "当前资源");
   await page
     .getByRole("spinbutton", { name: "加密母带", exact: true })
     .fill("1");
-  await page.getByRole("button", { name: "卡池状态" }).first().click();
+  await navigate(page, "卡池状态");
   await page.getByRole("spinbutton", { name: "当前垫数" }).first().fill("89");
-  await page.getByRole("button", { name: "目标编辑" }).first().click();
+  await navigate(page, "目标编辑");
   await page.getByRole("button", { name: "角色", exact: true }).click();
   await page.getByRole("textbox", { name: "目标名称" }).fill("无保证目标");
-  await page.getByRole("button", { name: "概率分析" }).first().click();
+  await navigate(page, "概率分析");
   await expect(page.getByText("无有限上界").first()).toBeVisible({
     timeout: 60000,
   });
 });
 test("第三方规则来源可停用、持久化并重新启用", async ({ page }, testInfo) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "数据来源" }).first().click();
+  await openPlanner(page);
+  await navigate(page, "数据来源");
   const source = page
     .locator(".comparison-row")
     .filter({ hasText: "GachaData 角色软保底拟合模型" });
@@ -105,7 +122,8 @@ test("第三方规则来源可停用、持久化并重新启用", async ({ page 
     source.getByRole("button", { name: "启用并应用" }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "数据来源" }).first().click();
+  await dismissStartupGuide(page);
+  await navigate(page, "数据来源");
   const reloaded = page
     .locator(".comparison-row")
     .filter({ hasText: "GachaData 角色软保底拟合模型" });
@@ -124,8 +142,8 @@ test("第三方规则来源可停用、持久化并重新启用", async ({ page 
 });
 
 test("特殊频道切换同一期自选目标时保留独立状态", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "特殊频道" }).first().click();
+  await openPlanner(page);
+  await navigate(page, "特殊频道");
   await expect(
     page.getByRole("heading", { name: "特殊频道", exact: true }),
   ).toBeVisible();
@@ -151,10 +169,19 @@ test("特殊频道切换同一期自选目标时保留独立状态", async ({ pa
 });
 
 test("历史卡池、离线记录和复刻周期表可用", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "版本时间轴" }).first().click();
-  await expect(page.getByText(/覆盖 1\.0 至 3\.2/)).toBeVisible();
-  await expect(page.getByText("官方记录（手动维护）")).toBeVisible();
+  await openPlanner(page);
+  await navigate(page, "版本时间轴");
+  await expect(page.getByText("同步暂不可用", { exact: true })).toBeVisible();
+  await expect(
+    page.locator(".phase-card h3").filter({ hasText: "Version 1.0" }).first(),
+  ).toBeVisible();
+  await expect(
+    page.locator(".phase-card h3").filter({ hasText: "Version 3.2" }).first(),
+  ).toBeVisible();
+  await expect(page.locator(".phase-source").first()).toHaveAttribute(
+    "href",
+    /^https:\/\//,
+  );
   await page.getByRole("tab", { name: "复刻周期" }).click();
   await expect(
     page.getByRole("heading", { name: "全角色复刻周期表" }),
@@ -170,7 +197,7 @@ test("历史卡池、离线记录和复刻周期表可用", async ({ page }) => 
 
 test("手机导航精简为常用入口并通过更多访问其余页面", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await openPlanner(page);
   const navigation = page.getByRole("navigation", { name: "手机导航" });
   await expect(navigation.getByRole("button")).toHaveCount(5);
   const moreButton = navigation.getByRole("button", { name: "更多页面" });

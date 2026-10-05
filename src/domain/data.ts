@@ -234,6 +234,7 @@ export const initialData = (): AppData => {
       simulations: 1000,
       seed: 20260915,
       theme: "dark",
+      showGuideOnStartup: true,
       language: "zh-CN",
     },
   };

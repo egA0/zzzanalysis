@@ -243,6 +243,7 @@ export type AppData = {
     simulations: number;
     seed: number;
     theme: "dark" | "light";
+    showGuideOnStartup: boolean;
     language: Locale;
   };
 };

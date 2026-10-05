@@ -73,6 +73,7 @@ import type {
   SpecialFamily,
 } from "../domain/types";
 import { useApp } from "../storage/store";
+import { UsageGuide, guideStartupLabel } from "./UsageGuide";
 import { clearData, exportJson, migrate } from "../storage/data";
 import {
   modeledConsolidatedChance,
@@ -1485,7 +1486,7 @@ function TimelinePage({
           <section className="band timeline-source">
             <div className="timeline-source-copy">
               <span
-                className={`sync-indicator ${data.bannerSync.lastError ? "error" : data.bannerSync.lastSuccessAt ? "online" : "loading"}`}
+                className={`sync-indicator ${data.bannerSync.lastError ? "error" : data.bannerSync.lastSuccessAt ? "online" : "pending"}`}
               />
               <div>
                 <strong>
@@ -2293,7 +2294,13 @@ function SpecialPage({
     </>
   );
 }
-function DistributionChart({ analysis }: { analysis: Analysis }) {
+function DistributionChart({
+  analysis,
+  theme,
+}: {
+  analysis: Analysis;
+  theme: AppData["settings"]["theme"];
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let disposed = false;
@@ -2302,12 +2309,23 @@ function DistributionChart({ analysis }: { analysis: Analysis }) {
     void import("echarts").then((echarts) => {
       if (!ref.current || disposed) return;
       chart = echarts.init(ref.current);
+      const styles = getComputedStyle(document.documentElement);
+      const color = (token: string) => styles.getPropertyValue(token).trim();
+      const muted = color("--muted");
+      const line = color("--line");
+      const accent = color("--chart-line");
       chart.setOption({
         backgroundColor: "transparent",
-        textStyle: { color: getComputedStyle(document.body).color },
-        grid: { left: 54, right: 16, top: 16, bottom: 42 },
+        animation: !window.matchMedia("(prefers-reduced-motion: reduce)")
+          .matches,
+        textStyle: { color: color("--text") },
+        grid: { left: 54, right: 24, top: 16, bottom: 58 },
         tooltip: {
           trigger: "axis",
+          backgroundColor: color("--surface"),
+          borderColor: color("--control-line"),
+          textStyle: { color: color("--text") },
+          axisPointer: { lineStyle: { color: accent } },
           formatter: (params: unknown) => {
             const p = (params as { axisValue: string; data: number }[])[0];
             return p
@@ -2318,9 +2336,14 @@ function DistributionChart({ analysis }: { analysis: Analysis }) {
         xAxis: {
           type: "category",
           name: "抽数",
+          nameLocation: "middle",
+          nameGap: 32,
+          nameTextStyle: { color: muted },
+          axisLine: { lineStyle: { color: line } },
+          axisTick: { lineStyle: { color: line } },
           data: analysis.distribution.map((x) => x.pulls),
           axisLabel: {
-            color: getComputedStyle(document.body).color,
+            color: muted,
             interval: Math.max(0, Math.floor(analysis.distribution.length / 7)),
           },
         },
@@ -2328,18 +2351,19 @@ function DistributionChart({ analysis }: { analysis: Analysis }) {
           type: "value",
           min: 0,
           max: 1,
+          splitLine: { lineStyle: { color: line } },
           axisLabel: {
             formatter: (v: number) => `${(v * 100).toFixed(0)}%`,
-            color: getComputedStyle(document.body).color,
+            color: muted,
           },
         },
         series: [
           {
             type: "line",
             symbol: "none",
-            areaStyle: { opacity: 0.16 },
-            lineStyle: { width: 3, color: "#e7ce31" },
-            itemStyle: { color: "#e7ce31" },
+            areaStyle: { opacity: 0.12, color: accent },
+            lineStyle: { width: 3, color: accent },
+            itemStyle: { color: accent },
             data: analysis.distribution.reduce((result: number[], point) => {
               result.push((result.at(-1) ?? 0) + point.probability);
               return result;
@@ -2355,7 +2379,7 @@ function DistributionChart({ analysis }: { analysis: Analysis }) {
       observer?.disconnect();
       chart?.dispose();
     };
-  }, [analysis]);
+  }, [analysis, theme]);
   return (
     <div
       ref={ref}
@@ -2612,7 +2636,10 @@ function AnalysisPage({
                 这里是当前投入上限下的<b>消耗分位</b>
                 ，失败而提前停止也包含在内，不能把它当成“获得目标的保障线”。理论最坏需求单独列出。
               </p>
-              <DistributionChart analysis={result.exact} />
+              <DistributionChart
+                analysis={result.exact}
+                theme={data.settings.theme}
+              />
             </section>
             <section className="band">
               <h2>计算过程与交叉验证</h2>
@@ -3160,11 +3187,13 @@ function SettingsPage({
   update,
   replace,
   setError,
+  openGuide,
 }: {
   data: AppData;
   update: (f: (d: AppData) => void) => void;
   replace: (d: AppData) => void;
   setError: (v: string) => void;
+  openGuide: () => void;
 }) {
   const file = useRef<HTMLInputElement>(null);
   return (
@@ -3173,6 +3202,26 @@ function SettingsPage({
         title="设置"
         subtitle="全部数据保存在本设备；离线可用，不需要游戏账号。"
       />
+      <section className="band">
+        <div className="section-heading">
+          <h2>使用指引</h2>
+          <button onClick={openGuide}>
+            <CircleHelp size={17} /> 打开使用指引
+          </button>
+        </div>
+        <p className="note">
+          查看资源录入、卡池状态、目标规划与数据备份的入门步骤；也可以从页面右上角随时打开。
+        </p>
+        <Toggle
+          label={guideStartupLabel}
+          checked={data.settings.showGuideOnStartup}
+          onChange={(value) =>
+            update((d) => {
+              d.settings.showGuideOnStartup = value;
+            })
+          }
+        />
+      </section>
       <section className="band">
         <h2>计算选项</h2>
         <div className="form-grid">
@@ -3590,6 +3639,8 @@ export default function App() {
   const { data, ready, error, update, replace, hydrate, setError } = useApp();
   const [view, setView] = useState<View>("home");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const guideInitialized = useRef(false);
   const mobileNavigationRef = useRef<HTMLDivElement>(null);
   const plan = useMemo(
     () => data.plans.find((p) => p.id === data.activePlanId) ?? data.plans[0],
@@ -3602,6 +3653,15 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = data.settings.theme;
   }, [data.settings.theme]);
+  useEffect(() => {
+    if (!ready || guideInitialized.current) return;
+    guideInitialized.current = true;
+    setGuideOpen(data.settings.showGuideOnStartup);
+  }, [ready, data.settings.showGuideOnStartup]);
+  const openGuide = () => {
+    setMoreOpen(false);
+    setGuideOpen(true);
+  };
   useEffect(() => {
     if (!moreOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -3665,6 +3725,15 @@ export default function App() {
                   ? "官方 + 第三方模型"
                   : "仅官方规则基线"}
               </span>
+              <button
+                className="guide-trigger"
+                title="打开使用指引"
+                aria-label="使用指引"
+                onClick={openGuide}
+              >
+                <CircleHelp size={18} />
+                <span>使用指引</span>
+              </button>
               <button
                 className="icon"
                 title="切换深浅模式"
@@ -3730,6 +3799,7 @@ export default function App() {
                 update={update}
                 replace={replace}
                 setError={setError}
+                openGuide={openGuide}
               />
             )}
           </div>
@@ -3783,6 +3853,17 @@ export default function App() {
             </button>
           </nav>
         </div>
+        {guideOpen && (
+          <UsageGuide
+            showOnStartup={data.settings.showGuideOnStartup}
+            onShowOnStartupChange={(value) =>
+              update((d) => {
+                d.settings.showGuideOnStartup = value;
+              })
+            }
+            onClose={() => setGuideOpen(false)}
+          />
+        )}
       </div>
     </ErrorBoundary>
   );
