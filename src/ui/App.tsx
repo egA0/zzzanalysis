@@ -2493,6 +2493,92 @@ function Advice({
     </section>
   );
 }
+function ChannelAnalysisSection({
+  data,
+  targets,
+  analysis,
+  channel,
+}: {
+  data: AppData;
+  targets: Target[];
+  analysis: Analysis;
+  channel: Channel;
+}) {
+  const channelTargets = targets
+    .map((target, index) => ({ target, index }))
+    .filter(
+      ({ target }) =>
+        target.channel === channel ||
+        (channel === "engine" &&
+          target.channel === "agent" &&
+          target.includeSignatureEngine === true),
+    );
+  const state = data.pity[channel];
+  return (
+    <section className="band" aria-labelledby={`analysis-${channel}-title`}>
+      <h2 id={`analysis-${channel}-title`}>{channelName(channel)}分析</h2>
+      <div className="metrics small-metrics">
+        <Metric
+          label="当前垫数"
+          value={`${state.count} 抽`}
+          detail="计划开始前的频道状态"
+        />
+        <Metric
+          label="距离 S 级硬保底"
+          value={`${data.rules.channels[channel].hardPity - state.count} 抽`}
+          detail="S 级不一定为目标限定"
+        />
+        <Metric
+          label="限定保证"
+          value={state.guaranteed ? "已保证" : "未保证"}
+          detail={
+            state.guaranteed
+              ? "下一次 S 必定为当期限定"
+              : "按当前频道规则计算限定分支"
+          }
+        />
+      </div>
+      {channelTargets.length === 0 ? (
+        <p className="empty">
+          {channel === "engine"
+            ? "尚未设置音擎目标；可在目标编辑中添加音擎，或为角色勾选“同时抽取专武”。"
+            : "尚未设置角色目标；可在目标编辑中添加角色。"}
+        </p>
+      ) : (
+        <>
+          <div className="result-list">
+            {channelTargets.map(({ target, index }) => {
+              const signature =
+                channel === "engine" && target.channel === "agent";
+              const copies = signature
+                ? (target.signatureEngineCopies ?? 1)
+                : target.copies;
+              return (
+                <div key={target.id}>
+                  <span>
+                    {signature ? `${target.name}的专属音擎` : target.name}
+                  </span>
+                  <strong>
+                    {pct(analysis.targetChannelProbabilities[index]![channel]!)}
+                  </strong>
+                  <small>
+                    {copies} 个 · 截止 {target.stopDate}
+                  </small>
+                </div>
+              );
+            })}
+          </div>
+          <p className="note">
+            各目标完成率已计入前序目标消耗、截止日期和投入上限，不是分别使用全部资源独立抽取的概率。
+            {channel === "engine" &&
+              channelTargets.some(({ target }) => target.channel === "agent") &&
+              "专属音擎在对应角色数量达成后抽取，与角色共享该目标的投入上限；角色与音擎的垫数和限定保证分别计算。"}
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
 function AnalysisPage({
   data,
   plan,
@@ -2579,14 +2665,32 @@ function AnalysisPage({
                 {targets.map((t, i) => (
                   <div key={t.id}>
                     <span>
-                      {channelName(t.channel)} · {t.name}
+                      {t.channel === "agent" &&
+                      t.includeSignatureEngine === true
+                        ? "角色 + 专属音擎"
+                        : channelName(t.channel)}{" "}
+                      · {t.name}
                     </span>
                     <strong>{pct(result.exact.targetProbabilities[i]!)}</strong>
-                    <small>在其截止日期及投入上限内完成</small>
+                    <small>
+                      {t.channel === "agent" &&
+                      t.includeSignatureEngine === true
+                        ? `${t.copies} 个角色与 ${t.signatureEngineCopies ?? 1} 个音擎均完成`
+                        : "在其截止日期及投入上限内完成"}
+                    </small>
                   </div>
                 ))}
               </div>
             </section>
+            {(["agent", "engine"] as Channel[]).map((channel) => (
+              <ChannelAnalysisSection
+                key={channel}
+                data={data}
+                targets={targets}
+                analysis={result.exact}
+                channel={channel}
+              />
+            ))}
             <section className="band">
               <h2>完成概率覆盖线</h2>
               <div className="metrics small-metrics">

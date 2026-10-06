@@ -225,6 +225,7 @@ const runProgression = (
   return { active, successByPull, activeByPull };
 };
 type CombinedOutcome = {
+  agentSuccess: boolean;
   states: Partial<Record<Channel, DrawState>>;
   pulls: number;
   success: boolean;
@@ -313,6 +314,8 @@ const globalKey = (s: Global) =>
 export type Analysis = {
   probability: number;
   targetProbabilities: number[];
+  // Per-channel completion within the ordered plan, not independent budgets.
+  targetChannelProbabilities: Partial<Record<Channel, number>>[];
   mean: number;
   median: number;
   p75: number;
@@ -480,6 +483,7 @@ const combinedDistribution = (
 
   for (const [pulls, probability] of successByPull) {
     outputs.push({
+      agentSuccess: true,
       states: {
         agent: { pity: 0, guaranteed: false },
         engine: { pity: 0, guaranteed: false },
@@ -491,6 +495,7 @@ const combinedDistribution = (
   }
   for (const failure of engineFailures.values()) {
     outputs.push({
+      agentSuccess: true,
       states: {
         agent: { pity: 0, guaranteed: false },
         engine: failure.state,
@@ -502,6 +507,7 @@ const combinedDistribution = (
   }
   for (const failure of agentFailures.values()) {
     outputs.push({
+      agentSuccess: false,
       states: { agent: failure.state, engine },
       pulls: cap,
       success: false,
@@ -543,6 +549,12 @@ export const analyze = (
   add(frontier, globalKey(starting), starting, 1);
   let exploredStates = 0;
   const worst = theoreticalWorst(targets, data);
+  const targetChannelProbabilities: Analysis["targetChannelProbabilities"] =
+    targets.map((target) =>
+      target.channel === "agent" && target.includeSignatureEngine === true
+        ? { agent: 0, engine: 0 }
+        : { [target.channel]: 0 },
+    );
   for (let index = 0; index < targets.length; index++) {
     checkCalculationBudget(options);
     const target = targets[index]!;
@@ -554,7 +566,7 @@ export const analyze = (
     )
       throw new Error("目标投入上限必须为 0 至 1200");
     const next = new Map<string, { state: Global; probability: number }>();
-    const cache = new Map<string, Outcome[]>();
+    const cache = new Map<string, (Outcome | CombinedOutcome)[]>();
     // Resource availability and prior channel usage are invariant across
     // frontier states, so compute them once per target.
     const available = availableAt(data, target.stopDate);
@@ -598,10 +610,10 @@ export const analyze = (
       };
 
       const cacheKey = `${target.channel}/${agentInitial.pity}/${+agentInitial.guaranteed}/${engineInitial.pity}/${+engineInitial.guaranteed}/${target.copies}/${target.signatureEngineCopies ?? 1}/${+combo}/${cap}`;
-      let outcomes = cache.get(cacheKey) as Outcome[] | undefined;
+      let outcomes = cache.get(cacheKey);
       if (!outcomes) {
         outcomes = combo
-          ? (combinedDistribution(
+          ? combinedDistribution(
               data,
               target,
               agentInitial,
@@ -610,7 +622,7 @@ export const analyze = (
               preparedAgent,
               preparedEngine,
               options,
-            ) as unknown as Outcome[])
+            )
           : targetDistributionPrepared(
               target.channel === "engine" ? preparedEngine : preparedAgent,
               target.channel === "engine" ? engineInitial : agentInitial,
@@ -620,29 +632,30 @@ export const analyze = (
             );
         cache.set(cacheKey, outcomes);
       }
-      for (const rawOutcome of outcomes) {
-        const outcome = rawOutcome as Outcome & {
-          states?: Partial<Record<Channel, DrawState>>;
-        };
-        const states = outcome.states;
+      for (const outcome of outcomes) {
+        const mass = entry.probability * outcome.probability;
+        const channelProbabilities = targetChannelProbabilities[index]!;
+        if ("states" in outcome) {
+          // A completed role remains successful even if its engine exhausts
+          // the remaining shared budget. No extra frontier masks are needed.
+          if (outcome.agentSuccess) channelProbabilities.agent! += mass;
+          if (outcome.success) channelProbabilities.engine! += mass;
+        } else if (outcome.success) {
+          channelProbabilities[target.channel]! += mass;
+        }
         const updated: Global = {
           ...s,
-          ...(states
+          ...("states" in outcome
             ? {
-                agent: states.agent ?? s.agent,
-                engine: states.engine ?? s.engine,
+                agent: outcome.states.agent ?? s.agent,
+                engine: outcome.states.engine ?? s.engine,
               }
             : { [target.channel]: outcome.state }),
           spent: s.spent + outcome.pulls,
           mask: s.mask | (outcome.success ? 1 << index : 0),
           stopped: outcome.success && !target.continueOnSuccess,
         };
-        add(
-          next,
-          globalKey(updated),
-          updated,
-          entry.probability * outcome.probability,
-        );
+        add(next, globalKey(updated), updated, mass);
       }
     }
     frontier = next;
@@ -687,6 +700,7 @@ export const analyze = (
   return {
     probability,
     targetProbabilities,
+    targetChannelProbabilities,
     mean,
     median: quantile(distribution, 0.5),
     p75: quantile(distribution, 0.75),

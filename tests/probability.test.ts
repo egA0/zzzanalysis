@@ -233,3 +233,149 @@ describe("完整规划", () => {
     expect(analyze(data, plan).probability).toBeGreaterThan(0);
   });
 });
+
+describe("角色与音擎分频道完成率", () => {
+  const setup = (pulls: number) => {
+    const data = initialData();
+    data.settings.includeEstimates = false;
+    data.resources.encrypted = pulls;
+    data.rules.channels.agent = { ...simple, featuredChance: 1 };
+    data.rules.channels.engine = { ...simple, featuredChance: 1 };
+    data.pity.agent.count = 2;
+    data.pity.engine.count = 2;
+    const plan = data.plans[0]!;
+    plan.targets = [
+      {
+        ...target("agent"),
+        includeSignatureEngine: true,
+        signatureEngineCopies: 1,
+        maxPulls: pulls,
+      },
+    ];
+    return { data, plan };
+  };
+
+  it("角色已完成但预算不足抽音擎时，不把角色完成率当成音擎完成率", () => {
+    const { data, plan } = setup(1);
+    const result = analyze(data, plan);
+    expect(result.targetChannelProbabilities).toEqual([
+      { agent: 1, engine: 0 },
+    ]);
+    expect(result.targetProbabilities).toEqual([0]);
+    expect(result.probability).toBe(0);
+    expect(
+      result.distribution.reduce((sum, point) => sum + point.probability, 0),
+    ).toBeCloseTo(1);
+  });
+
+  it("组合目标未获得角色时也不获得专属音擎", () => {
+    const { data, plan } = setup(1);
+    data.pity.agent.count = 0;
+    expect(analyze(data, plan).targetChannelProbabilities).toEqual([
+      { agent: 0, engine: 0 },
+    ]);
+    plan.targets[0]!.maxPulls = 0;
+    expect(analyze(data, plan).targetChannelProbabilities).toEqual([
+      { agent: 0, engine: 0 },
+    ]);
+  });
+
+  it("两个频道的初始垫数独立生效", () => {
+    const { data, plan } = setup(2);
+    data.pity.engine.count = 1;
+    expect(analyze(data, plan).targetChannelProbabilities).toEqual([
+      { agent: 1, engine: 0 },
+    ]);
+    data.pity.engine.count = 2;
+    const result = analyze(data, plan);
+    expect(result.targetChannelProbabilities).toEqual([
+      { agent: 1, engine: 1 },
+    ]);
+    expect(result.probability).toBe(1);
+  });
+
+  it("分别按角色及音擎限定分支计算共享预算下的边缘概率", () => {
+    const { data, plan } = setup(4);
+    data.rules.channels.agent.featuredChance = 0.5;
+    data.rules.channels.engine.featuredChance = 0.75;
+    const result = analyze(data, plan);
+    expect(result.targetChannelProbabilities[0]!.agent).toBeCloseTo(1);
+    expect(result.targetChannelProbabilities[0]!.engine).toBeCloseTo(0.375);
+    expect(result.targetProbabilities[0]).toBeCloseTo(0.375);
+    expect(result.probability).toBeCloseTo(0.375);
+    expect(simulate(data, plan, 20000, 123).probability).toBeCloseTo(
+      result.probability,
+      2,
+    );
+    data.resources.encrypted = 5;
+    plan.targets[0]!.maxPulls = 5;
+    expect(
+      analyze(data, plan).targetChannelProbabilities[0]!.engine,
+    ).toBeCloseTo(0.875);
+  });
+
+  it("音擎限定保证与角色保证分开计算", () => {
+    const { data, plan } = setup(2);
+    data.rules.channels.engine.featuredChance = 0.75;
+    expect(
+      analyze(data, plan).targetChannelProbabilities[0]!.engine,
+    ).toBeCloseTo(0.75);
+    data.pity.agent.guaranteed = true;
+    expect(
+      analyze(data, plan).targetChannelProbabilities[0]!.engine,
+    ).toBeCloseTo(0.75);
+    data.pity.engine.guaranteed = true;
+    expect(analyze(data, plan).targetChannelProbabilities[0]!.engine).toBe(1);
+  });
+
+  it("角色和音擎均按各自要求的数量判断完成", () => {
+    const { data, plan } = setup(5);
+    plan.targets[0]!.copies = 2;
+    plan.targets[0]!.signatureEngineCopies = 2;
+    expect(analyze(data, plan).targetChannelProbabilities).toEqual([
+      { agent: 1, engine: 0 },
+    ]);
+    data.resources.encrypted = 8;
+    plan.targets[0]!.maxPulls = 8;
+    expect(analyze(data, plan).targetChannelProbabilities).toEqual([
+      { agent: 1, engine: 1 },
+    ]);
+  });
+
+  it("前序音擎消耗资源并继承频道状态，不能各自独占全部预算", () => {
+    const { data, plan } = setup(3);
+    plan.targets.unshift({ ...target("engine"), maxPulls: 1 });
+    expect(analyze(data, plan).targetChannelProbabilities).toEqual([
+      { engine: 1 },
+      { agent: 1, engine: 0 },
+    ]);
+    data.resources.encrypted = 5;
+    plan.targets[1]!.maxPulls = 4;
+    expect(analyze(data, plan).targetChannelProbabilities).toEqual([
+      { engine: 1 },
+      { agent: 1, engine: 1 },
+    ]);
+  });
+
+  it("前序目标成功后停止时，未执行的音擎目标完成率为零", () => {
+    const { data, plan } = setup(6);
+    plan.targets = [
+      { ...target("agent"), continueOnSuccess: false },
+      target("engine"),
+    ];
+    expect(analyze(data, plan).targetChannelProbabilities).toEqual([
+      { agent: 1 },
+      { engine: 0 },
+    ]);
+  });
+
+  it("独立音擎目标与目标完成率一致，跳过目标不占结果索引", () => {
+    const { data, plan } = setup(1);
+    data.rules.channels.engine.featuredChance = 0.75;
+    plan.targets = [{ ...plan.targets[0]!, skipped: true }, target("engine")];
+    const result = analyze(data, plan);
+    expect(result.targetChannelProbabilities).toEqual([{ engine: 0.75 }]);
+    expect(result.targetProbabilities).toEqual([0.75]);
+    expect(result.probability).toBe(0.75);
+  });
+});
