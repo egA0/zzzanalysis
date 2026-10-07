@@ -3822,6 +3822,12 @@ export default function App() {
         </aside>
         <main>
           <header className="topbar">
+            <img
+              className="topbar-mark"
+              src={`${import.meta.env.BASE_URL}zenless-zone-zero-logo.png`}
+              alt=""
+              aria-hidden="true"
+            />
             <span className="breadcrumb">规划台 / {title}</span>
             <div className="top-actions">
               <span className="model-pill">

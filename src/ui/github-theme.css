@@ -225,19 +225,15 @@ a:hover {
   background: var(--header-bg);
   border-bottom: 1px solid var(--line);
 }
-.topbar::before {
-  content: "S/";
-  display: grid;
-  place-items: center;
+.topbar-mark {
+  display: block;
   flex: none;
   width: 32px;
   height: 32px;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--text);
-  color: var(--canvas);
-  font-family: ui-monospace, "Cascadia Code", monospace;
-  font-size: 16px;
-  font-weight: 700;
+  object-fit: cover;
+  background: var(--panel-strong);
 }
 .breadcrumb {
   flex: 1;
@@ -633,8 +629,9 @@ a:hover {
     padding: 0 16px;
     gap: 8px;
   }
-  .topbar::before {
-    display: none;
+  .topbar-mark {
+    width: 28px;
+    height: 28px;
   }
   .breadcrumb {
     font-size: 12px;
