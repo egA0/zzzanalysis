@@ -116,8 +116,6 @@ npm run verify:rules
 
 普通用户可以通过仓库 Issues 反馈问题、提出改进建议或更正文案，不需要会编程或使用 agent。请说明复现步骤、预期和实际结果、浏览器及设备信息；分享截图或脱敏后的最小示例即可。不要提交个人完整导出 JSON、访问令牌、`.env`、本地备份或账号信息。
 
-仓库尚未提供许可证文件；再分发或复用前，请先确认作者授权范围。
-
 ## 技术栈与文档
 
 React、严格 TypeScript、Vite、Zustand、IndexedDB、ECharts、Vitest、Playwright、Web Worker 与 PWA。界面使用项目内 CSS。
