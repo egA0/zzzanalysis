@@ -186,7 +186,7 @@ test("历史卡池、离线记录和复刻周期表可用", async ({ page }) => 
   await expect(
     page.getByRole("heading", { name: "全角色复刻周期表" }),
   ).toBeVisible();
-  await expect(page.locator(".rerun-row")).toHaveCount(42);
+  await expect(page.locator(".rerun-row")).toHaveCount(44);
   await expect(page.getByText("琉音", { exact: true }).first()).toBeVisible();
   expect(
     await page.evaluate(

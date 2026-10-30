@@ -1,10 +1,17 @@
 import type { AppData, Banner, VersionResourceEntry } from "../domain/types";
 import { formatDate } from "../domain/date";
+import {
+  activeVersionForDate,
+  bundledVersionCatalog,
+  versionDescriptor,
+} from "./version-catalog";
 
-export const currentVersion = "3.2";
-export const currentVersionStart = "2026-09-09";
-export const currentVersionEnd = "2026-10-20";
-export const currentVersionDays = 42;
+export const currentVersion = activeVersionForDate(formatDate());
+export const currentVersionStart =
+  versionDescriptor(currentVersion).start || formatDate();
+export const currentVersionEnd =
+  versionDescriptor(currentVersion).end || currentVersionStart;
+export const currentVersionDays = versionDescriptor(currentVersion).days || 42;
 export const futureVersionDefaultPulls = 90;
 export const defaultDailyFilm = 60;
 export const defaultMonthlyFilm = 90;
@@ -47,64 +54,79 @@ const manualEntry = (
   ...value,
 });
 
+const entriesForVersion = (version: string): VersionResourceEntry[] => {
+  const descriptor = versionDescriptor(version);
+  const days = descriptor.days || 42;
+  const activityPulls =
+    futureVersionDefaultPulls -
+    ((defaultDailyFilm + defaultMonthlyFilm) * days) / 160;
+  return [
+    manualEntry({
+      id: `manual-${version}-activity`,
+      version,
+      scope: "f2p",
+      label: `${version} 活动页面版本资源`,
+      pulls: activityPulls,
+      film: null,
+      encryptedTapes: null,
+      masterTapes: null,
+      boopons: null,
+      start: descriptor.start,
+      end: descriptor.end,
+      sourceId: manualVersionResourceSourceId,
+      sourceName: "活动页面手工记录",
+      sourceKind: "manual",
+      certainty: "estimated",
+      checkedAt: descriptor.start,
+      note: "默认活动资源 = 90 抽 - 完整版本每日活跃与月卡资源；不会因剩余天数变化而减少。",
+    }),
+    manualEntry({
+      id: `manual-${version}-daily-active`,
+      version,
+      scope: "confirmed",
+      label: "每日活跃（按天数计算）",
+      pulls: null,
+      film: defaultDailyFilm,
+      encryptedTapes: null,
+      masterTapes: null,
+      boopons: null,
+      start: descriptor.start,
+      end: descriptor.end,
+      sourceId: manualVersionResourceSourceId,
+      sourceName: "每日活跃手工参数",
+      sourceKind: "manual",
+      certainty: "estimated",
+      checkedAt: descriptor.start,
+      note: "每日活跃固定为 60 菲林/天；旧数据中的该字段仅保留兼容，不再作为可编辑参数。",
+    }),
+    manualEntry({
+      id: `manual-${version}-monthly`,
+      version,
+      scope: "monthly",
+      label: "月卡（按天数计算）",
+      pulls: null,
+      film: defaultMonthlyFilm,
+      encryptedTapes: null,
+      masterTapes: null,
+      boopons: null,
+      start: descriptor.start,
+      end: descriptor.end,
+      sourceId: manualVersionResourceSourceId,
+      sourceName: "月卡手工参数",
+      sourceKind: "manual",
+      certainty: "estimated",
+      checkedAt: descriptor.start,
+      note: "月卡每日菲林 × 版本持续天数 ÷ 160；只有账号购买月卡时才计入版本资源。",
+    }),
+  ];
+};
+
+// Keep the previous version for historical imports while automatically adding
+// the newest bundled version when a new phase is shipped.
 export const bundledVersionResources: VersionResourceEntry[] = [
-  manualEntry({
-    id: "manual-3.2-activity",
-    version: currentVersion,
-    scope: "f2p",
-    label: "3.2 活动页面版本资源",
-    pulls: defaultActivityPulls,
-    film: null,
-    encryptedTapes: null,
-    masterTapes: null,
-    boopons: null,
-    start: currentVersionStart,
-    end: currentVersionEnd,
-    sourceId: manualVersionResourceSourceId,
-    sourceName: "活动页面手工记录",
-    sourceKind: "manual",
-    certainty: "estimated",
-    checkedAt: currentVersionStart,
-    note: "默认活动资源 = 90 抽 - 完整版本每日活跃与月卡资源；不会因剩余天数变化而减少。",
-  }),
-  manualEntry({
-    id: "manual-3.2-daily-active",
-    version: currentVersion,
-    scope: "confirmed",
-    label: "每日活跃（按天数计算）",
-    pulls: null,
-    film: defaultDailyFilm,
-    encryptedTapes: null,
-    masterTapes: null,
-    boopons: null,
-    start: currentVersionStart,
-    end: currentVersionEnd,
-    sourceId: manualVersionResourceSourceId,
-    sourceName: "每日活跃手工参数",
-    sourceKind: "manual",
-    certainty: "estimated",
-    checkedAt: currentVersionStart,
-    note: "每日活跃固定为 60 菲林/天；旧数据中的该字段仅保留兼容，不再作为可编辑参数。",
-  }),
-  manualEntry({
-    id: "manual-3.2-monthly",
-    version: currentVersion,
-    scope: "monthly",
-    label: "月卡（按天数计算）",
-    pulls: null,
-    film: defaultMonthlyFilm,
-    encryptedTapes: null,
-    masterTapes: null,
-    boopons: null,
-    start: currentVersionStart,
-    end: currentVersionEnd,
-    sourceId: manualVersionResourceSourceId,
-    sourceName: "月卡手工参数",
-    sourceKind: "manual",
-    certainty: "estimated",
-    checkedAt: currentVersionStart,
-    note: "月卡每日菲林 × 版本持续天数 ÷ 160；只有账号购买月卡时才计入版本资源。",
-  }),
+  ...bundledVersionCatalog
+    .slice(-2)
+    .flatMap((item) => entriesForVersion(item.version)),
 ];
 
 export const bundledVersionResourcesForSource = (sourceId: string) =>
@@ -364,7 +386,7 @@ export const futureVersionProjections = (
 ): FutureVersionProjection[] => {
   const current = versionResourceView(data, currentVersion);
   const averageDays = current.days || currentVersionDays;
-  const startDay = parseDay(currentVersionEnd) + 1;
+  const startDay = parseDay(current.end) + 1;
   return Array.from({ length: count }, (_, index) => {
     const start = startDay + index * averageDays;
     return {
@@ -416,8 +438,7 @@ export const estimatedVersionPullsUntil = (data: AppData, deadline: string) => {
   const projectionCount = Math.max(
     24,
     Math.ceil(
-      Math.max(0, parseDay(deadline) - parseDay(currentVersionEnd)) /
-        currentVersionDays,
+      Math.max(0, parseDay(deadline) - parseDay(current.end)) / current.days,
     ) + 2,
   );
   for (const projection of futureVersionProjections(data, projectionCount)) {

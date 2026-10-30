@@ -216,7 +216,9 @@ export type VersionResourceSyncState = {
   disabledSourceIds: string[];
 };
 export type AppData = {
-  schemaVersion: 12;
+  schemaVersion: 13;
+  /** Revision of bundled game content already merged into this local copy. */
+  contentRevision: string;
   resources: Resources;
   pity: Record<Channel, Pity>;
   specialPlans: Record<SpecialFamily, SpecialPlanState>;

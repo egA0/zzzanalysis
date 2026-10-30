@@ -16,7 +16,7 @@ it("旧版本迁移并补齐设置", () => {
   channels.agent!.rateSteps = [];
   channels.engine!.rateSteps = [];
   const migrated = migrate(old);
-  expect(migrated.schemaVersion).toBe(12);
+  expect(migrated.schemaVersion).toBe(13);
   expect(migrated.settings.includeEstimates).toBe(true);
   expect(migrated.rules.enabledSourceIds).toContain(
     "gachadata-agent-soft-pity",
@@ -34,6 +34,13 @@ it("normalizes slash dates from locale output during migration", () => {
   const migrated = migrate(old);
   expect(migrated.banners[0]!.start).toBe("2026-09-09");
   expect(migrated.banners[0]!.end).toBe("2026-10-20");
+});
+it("normalizes ISO banner update timestamps during migration", () => {
+  const old = initialData() as unknown as Record<string, unknown>;
+  const banners = old.banners as Array<Record<string, unknown>>;
+  banners[0]!.updatedAt = "2026-10-22T14:35:12.345Z";
+  const migrated = migrate(old);
+  expect(migrated.banners[0]!.updatedAt).toBe("2026-10-22");
 });
 it("第四版特殊频道布尔字段迁移为明确继承关系", () => {
   const old = initialData() as unknown as Record<string, unknown>;

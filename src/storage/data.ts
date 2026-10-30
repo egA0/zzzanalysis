@@ -1,5 +1,6 @@
 import { openDB } from "idb";
 import { defaultRules, initialData, nonnegative, today } from "../domain/data";
+import { syncBundledContent } from "../data/content";
 import { formatDate } from "../domain/date";
 import { validateRule } from "../engine/probability";
 import { validateSpecialRule } from "../engine/special";
@@ -23,7 +24,7 @@ import {
 } from "../data/banner-history";
 import {
   bundledVersionResources,
-  currentVersionDays,
+  currentVersion,
   defaultActivityPulls,
   defaultMonthlyFilm,
 } from "../data/version-resources";
@@ -81,6 +82,18 @@ const validDate = (s: unknown) => {
   )
     throw new Error("日期格式必须为 YYYY-MM-DD");
   return canonical;
+};
+const bannerUpdatedDate = (value: unknown, fallback: string) => {
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    const timestamp =
+      /^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?Z$/.exec(
+        normalized,
+      );
+    if (timestamp && Number.isFinite(Date.parse(normalized)))
+      return validDate(timestamp[1]);
+  }
+  return validDate(value ?? fallback);
 };
 const migrateSpecialRule = (
   raw: unknown,
@@ -170,7 +183,8 @@ export const migrate = (input: unknown): AppData => {
     source.schemaVersion !== 9 &&
     source.schemaVersion !== 10 &&
     source.schemaVersion !== 11 &&
-    source.schemaVersion !== 12
+    source.schemaVersion !== 12 &&
+    source.schemaVersion !== 13
   )
     throw new Error("未知数据版本；未覆盖本地数据");
   const base = initialData();
@@ -348,7 +362,10 @@ export const migrate = (input: unknown): AppData => {
                 ),
                 priority: whole(t.priority ?? 1, 1, 10),
                 maxPulls: whole(t.maxPulls ?? 180, 0, 1200),
-                targetVersion: String(t.targetVersion ?? "3.2").slice(0, 16),
+                targetVersion: String(t.targetVersion ?? currentVersion).slice(
+                  0,
+                  16,
+                ),
                 targetPhase: t.targetPhase === 1 ? 1 : 2,
                 stopDate: validDate(t.stopDate ?? "2099-01-01"),
                 continueOnSuccess: t.continueOnSuccess !== false,
@@ -440,7 +457,7 @@ export const migrate = (input: unknown): AppData => {
       source: sourceUrl,
       sourceId,
       sourceKind,
-      updatedAt: validDate(b.updatedAt ?? base.rules.verifiedAt),
+      updatedAt: bannerUpdatedDate(b.updatedAt, base.rules.verifiedAt),
     };
   };
   if (Array.isArray(source.banners)) {
@@ -681,55 +698,57 @@ export const migrate = (input: unknown): AppData => {
     });
   }
   if (Array.isArray(source.versionResources)) {
-    const legacyActivity = base.versionResources.find(
-      (resource) =>
-        resource.version === "3.2" &&
-        resource.scope === "f2p" &&
-        resource.pulls !== null,
+    const importedResources = [...base.versionResources];
+    const defaults = structuredClone(bundledVersionResources);
+    const defaultById = new Map(
+      defaults.map((resource) => [resource.id, resource]),
     );
-    const manualEntries = base.versionResources.filter(
+    const manualEntries = importedResources.filter(
       (resource) => resource.sourceKind === "manual",
     );
-    const defaults = structuredClone(bundledVersionResources);
-    const hasManualActivity = manualEntries.some(
-      (resource) => resource.id === "manual-3.2-activity",
-    );
-    if (!hasManualActivity && legacyActivity) {
-      const activity = defaults.find(
-        (resource) => resource.id === "manual-3.2-activity",
+    for (const resource of manualEntries) {
+      const defaultActivity = defaultById.get(
+        `manual-${resource.version}-activity`,
       );
-      if (activity) activity.pulls = legacyActivity.pulls;
-    }
-    if (source.schemaVersion !== 10) {
-      const activity = manualEntries.find(
-        (resource) => resource.id === "manual-3.2-activity",
+      const defaultMonthly = defaultById.get(
+        `manual-${resource.version}-monthly`,
       );
-      if (activity?.pulls === null) activity.pulls = defaultActivityPulls;
-    }
-    if (source.schemaVersion < 11) {
-      const activity = manualEntries.find(
-        (resource) => resource.id === "manual-3.2-activity",
-      );
-      const monthly = manualEntries.find(
-        (resource) => resource.id === "manual-3.2-monthly",
-      );
-      const legacyDefaultActivityPulls =
-        defaultActivityPulls + (defaultMonthlyFilm * currentVersionDays) / 160;
+      if (source.schemaVersion !== 10 && resource.scope === "f2p") {
+        if (resource.pulls === null)
+          resource.pulls = defaultActivity?.pulls ?? defaultActivityPulls;
+      }
       if (
-        activity?.film === null &&
-        activity.pulls === legacyDefaultActivityPulls &&
-        monthly?.film === 0
+        source.schemaVersion < 11 &&
+        resource.scope === "f2p" &&
+        resource.film === null &&
+        resource.pulls !== null &&
+        defaultMonthly?.film === 0
       ) {
-        activity.pulls = defaultActivityPulls;
-        if (monthly) monthly.film = defaultMonthlyFilm;
+        const days = defaultActivity
+          ? Math.max(
+              1,
+              Math.floor(
+                (Date.parse(`${defaultActivity.end}T00:00:00Z`) -
+                  Date.parse(`${defaultActivity.start}T00:00:00Z`)) /
+                  86400000,
+              ) + 1,
+            )
+          : 42;
+        const legacyDefault =
+          (defaultActivity?.pulls ?? defaultActivityPulls) +
+          (defaultMonthlyFilm * days) / 160;
+        if (resource.pulls === legacyDefault) {
+          resource.pulls = defaultActivity?.pulls ?? defaultActivityPulls;
+          defaultMonthly.film = defaultMonthlyFilm;
+        }
       }
     }
+    const existingIds = new Set(
+      importedResources.map((resource) => resource.id),
+    );
     base.versionResources = [
-      ...manualEntries,
-      ...defaults.filter(
-        (resource) =>
-          !manualEntries.some((existing) => existing.id === resource.id),
-      ),
+      ...importedResources,
+      ...defaults.filter((resource) => !existingIds.has(resource.id)),
     ];
   }
   if (source.resourceProgress && typeof source.resourceProgress === "object") {
@@ -773,7 +792,8 @@ export const migrate = (input: unknown): AppData => {
         : [],
     };
   }
-  base.schemaVersion = 12;
+  syncBundledContent(base);
+  base.schemaVersion = 13;
   return base;
 };
 export const exportJson = (data: AppData) => {

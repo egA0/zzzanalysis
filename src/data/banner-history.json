@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-16",
+  "checkedAt": "2026-10-22",
   "phases": [
     {
       "id": "1.0-1",
@@ -361,6 +361,30 @@
       "end": "2026-10-20",
       "agents": ["Roxy", "Promeia"],
       "engines": ["Crimson Moon Casket", "Frostfall Sickle"]
+    },
+    {
+      "id": "3.3-1",
+      "version": "3.3",
+      "phase": 1,
+      "start": "2026-10-21",
+      "end": "2026-11-11",
+      "agents": ["Fiona", "Velina"],
+      "engines": ["Nirvana Feather", "Elegant Vanity"],
+      "sourceId": "official-banner-history",
+      "sourceKind": "official",
+      "source": "https://zenless.hoyoverse.com/m/zh-cn/news/166963"
+    },
+    {
+      "id": "3.3-2",
+      "version": "3.3",
+      "phase": 2,
+      "start": "2026-11-11",
+      "end": "2026-12-01",
+      "agents": ["Severian", "Norma"],
+      "engines": ["Forbidden Cage", "Chief Sidekick"],
+      "sourceId": "official-banner-history",
+      "sourceKind": "official",
+      "source": "https://zenless.hoyoverse.com/m/zh-cn/news/166963"
     }
   ],
   "specialPhases": [

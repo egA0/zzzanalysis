@@ -8,11 +8,20 @@ import type {
   Rules,
   Target,
 } from "./types";
-import { estimatedVersionPullsUntil } from "../data/version-resources";
+import {
+  currentVersion,
+  currentVersionEnd,
+  currentVersionStart,
+  estimatedVersionPullsUntil,
+} from "../data/version-resources";
 import { bundledBanners } from "../data/banner-history";
 import { bundledVersionResources } from "../data/version-resources";
 import { bundledAnnouncedCharacters } from "../data/announced-characters";
 import { formatDate } from "./date";
+import {
+  bundledContentRevision,
+  bundledVersionCatalog,
+} from "../data/version-catalog";
 
 export { defaultRules };
 
@@ -46,11 +55,26 @@ export const nonnegative = (value: unknown, max = 1_000_000_000): number => {
     throw new Error(`请输入 0 至 ${max} 的数字`);
   return n;
 };
+const loginIncome = (version: string, start: string, end: string): Income => ({
+  id: id(),
+  name: `${version} 七日登录奖励（达到等级并完成登录）`,
+  source: "https://zenless.hoyoverse.com/zh-cn/news",
+  category: "event",
+  amount: 10,
+  unit: "tape",
+  start,
+  end,
+  everyDays: 0,
+  certainty: "confirmed",
+  enabled: false,
+});
+
 export const initialData = (): AppData => {
   const date = today();
   const planId = id();
   return {
-    schemaVersion: 12,
+    schemaVersion: 13,
+    contentRevision: bundledContentRevision,
     resources: {
       film: 0,
       encrypted: 0,
@@ -195,19 +219,16 @@ export const initialData = (): AppData => {
         certainty: "estimated",
         enabled: false,
       },
-      {
-        id: id(),
-        name: "3.2 七日登录奖励（达到等级并完成登录）",
-        source: "https://zenless.hoyoverse.com/zh-cn/news/166000?catchSpider=1",
-        category: "event",
-        amount: 10,
-        unit: "tape",
-        start: "2026-09-09",
-        end: "2026-10-20",
-        everyDays: 0,
-        certainty: "confirmed",
-        enabled: false,
-      },
+      ...(bundledVersionCatalog.at(-2)
+        ? [
+            loginIncome(
+              bundledVersionCatalog.at(-2)!.version,
+              bundledVersionCatalog.at(-2)!.start,
+              bundledVersionCatalog.at(-2)!.end,
+            ),
+          ]
+        : []),
+      loginIncome(currentVersion, currentVersionStart, currentVersionEnd),
     ],
     versionResources: structuredClone(bundledVersionResources),
     resourceProgress: {},

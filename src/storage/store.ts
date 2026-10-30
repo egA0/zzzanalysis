@@ -29,7 +29,12 @@ export const useApp = create<Store>((set, get) => ({
   hydrate: async () => {
     try {
       const data = await loadData();
-      set({ data: data ?? get().data, ready: true });
+      if (data) {
+        set({ data, ready: true });
+        await saveData(data);
+      } else {
+        set({ ready: true });
+      }
     } catch (e) {
       set({ ready: true, error: `读取本地数据失败：${String(e)}` });
     }

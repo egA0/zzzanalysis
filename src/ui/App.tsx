@@ -3,6 +3,7 @@ import { toPng } from "html-to-image";
 import {
   Activity,
   Archive,
+  ArrowRight,
   BarChart3,
   CalendarDays,
   Check,
@@ -411,13 +412,15 @@ function Metric({
   label,
   value,
   detail,
+  emphasis = false,
 }: {
   label: string;
   value: string | number;
   detail?: string;
+  emphasis?: boolean;
 }) {
   return (
-    <div className="metric">
+    <div className="metric" data-emphasis={emphasis ? "true" : undefined}>
       <span>{label}</span>
       <strong>{value}</strong>
       {detail && <small>{detail}</small>}
@@ -476,6 +479,7 @@ function ResourcesPage({
       />
       <div className="metrics">
         <Metric
+          emphasis
           label="当前限定抽数"
           value={currentPulls(r, data.rules)}
           detail="向下取整，不含未领取收入"
@@ -2008,8 +2012,8 @@ function SpecialPage({
         subtitle="独立规划“独家重映”与“音擎回响”；常驻频段不纳入。"
       />
       <p className="warning">
-        截至 2026-09-18，3.2 当前官方频道索引没有特殊频道。本页用于复盘 2.5、3.1
-        机制及模拟未来同机制频道。
+        当前版本 {currentVersion}{" "}
+        的特殊频道记录由已核验公告维护。本页用于复盘历史机制及模拟未来同机制频道。
       </p>
       <p className="note">
         3.1 起的“S
@@ -2360,7 +2364,8 @@ function DistributionChart({
         series: [
           {
             type: "line",
-            symbol: "none",
+            symbol: analysis.distribution.length === 1 ? "circle" : "none",
+            symbolSize: 8,
             areaStyle: { opacity: 0.12, color: accent },
             lineStyle: { width: 3, color: accent },
             itemStyle: { color: accent },
@@ -2384,6 +2389,7 @@ function DistributionChart({
     <div
       ref={ref}
       className="chart"
+      data-point-count={analysis.distribution.length}
       role="img"
       aria-label="规划实际消耗抽数的累计概率曲线"
     />
@@ -2644,6 +2650,7 @@ function AnalysisPage({
             </div>
             <div className="metrics">
               <Metric
+                emphasis
                 label="整套计划完成概率"
                 value={pct(result.exact.probability)}
                 detail="所有未跳过目标均完成"
@@ -3660,12 +3667,9 @@ function HomePage({
           </button>
         }
       />
-      <div className="warning">
-        <ShieldAlert size={18} />
-        概率曲线尚未由当前官方逐抽详情核验。所有成功率为可编辑配置模型估算。
-      </div>
       <div className="metrics">
         <Metric
+          emphasis
           label="当前限定抽数"
           value={currentPulls(data.resources, data.rules)}
           detail="菲林、加密母带与可兑换副产物"
@@ -3681,16 +3685,21 @@ function HomePage({
           detail="跳过的目标不计入"
         />
         <Metric
+          emphasis
           label="完成概率"
           value={result ? pct(result.exact.probability) : "待计算"}
           detail="仅配置模型"
         />
       </div>
-      <section className="band">
+      <div className="warning compact">
+        <ShieldAlert size={18} />
+        概率曲线尚未由当前官方逐抽详情核验。所有成功率为可编辑配置模型估算。
+      </div>
+      <section className="band home-plan">
         <div className="section-heading">
           <h2>当前方案 · {plan.name}</h2>
           <button onClick={() => setView("analysis")}>
-            查看分析 <ChevronDown size={16} />
+            查看分析 <ArrowRight size={16} />
           </button>
         </div>
         {active.length ? (

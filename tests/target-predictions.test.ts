@@ -29,7 +29,7 @@ it("官方已公布但未出现在卡池记录的角色可进入目录并预测�
 
 it("未来版本会进入目标版本选项", () => {
   const data = initialData();
-  expect(futureVersionList(data).slice(0, 3)).toEqual(["3.3", "3.4", "3.5"]);
+  expect(futureVersionList(data).slice(0, 3)).toEqual(["3.4", "3.5", "3.6"]);
   expect(futureVersionList(data)).toContain("4.0");
 });
 

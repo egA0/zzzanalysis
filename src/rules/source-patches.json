@@ -11,7 +11,7 @@
     },
     {
       "id": "hoyoverse-agent-probability-json",
-      "name": "3.2 当前角色频道概率详情 JSON",
+      "name": "当前角色频道概率详情 JSON",
       "url": "https://operation-webstatic.hoyoverse.com/gacha_info/nap/prod_gf_us/98a3519e56172f5fb33a81665875197f6c830459/zh-cn.json",
       "checkedAt": "2026-09-16",
       "confidence": "最高：官方概率页面直接读取的数据文件",
@@ -20,7 +20,7 @@
     },
     {
       "id": "hoyoverse-engine-probability-json",
-      "name": "3.2 当前音擎频道概率详情 JSON",
+      "name": "当前音擎频道概率详情 JSON",
       "url": "https://operation-webstatic.hoyoverse.com/gacha_info/nap/prod_gf_us/ba51ad818b41d1324aabe7403328da060599979a/zh-cn.json",
       "checkedAt": "2026-09-16",
       "confidence": "最高：官方概率页面直接读取的数据文件",
